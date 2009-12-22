@@ -279,7 +279,7 @@ exports.init.prototype = {
 		if(this.authenticated === true) {
 			return this.makeRequest({
 				type: "GET",
-				url: "/statuses/retweets/" + paramsObj.id + ".json" + (paramsObj.count ? "?count=" + paramsObj.count : "");
+				url: "/statuses/retweets/" + paramsObj.id + ".json" + (paramsObj.count ? ("?count=" + paramsObj.count) : ""),
 				callback: callbackfn
 			});
 		} else {
@@ -570,7 +570,7 @@ exports.init.prototype = {
 			return this.makeRequest({
 				type: "POST",
 				url: "/account/end_session.json",
-				callback: function() { that.authenticated = false;
+				callback: function() { that.authenticated = false; }
 			});
 		} else {
 			return sys.puts("You can't end a session when you're not authenticated to begin with.")
@@ -590,9 +590,9 @@ exports.init.prototype = {
 		*/
 		if(this.authenticated === true) {
 			var apiURL = "/direct_messages.json?page=" + (paramsObj.page ? paramsObj.page : 1);
-			if(paramsObj.since_id) apiURL += "&since_id=" paramsObj.since_id
-			if(paramsObj.max_id) apiURL += "&max_id=" + paramsObj.max_id
-			if(paramsObj.count) apiURL += "&count=" + paramsObj.count
+			if(paramsObj.since_id) apiURL += "&since_id=" + paramsObj.since_id;
+			if(paramsObj.max_id) apiURL += "&max_id=" + paramsObj.max_id;
+			if(paramsObj.count) apiURL += "&count=" + paramsObj.count;
 
 			return this.makeRequest({
 				type: "GET",
@@ -929,6 +929,7 @@ exports.init.prototype = {
 				});
 			} else {
 				return sys.puts("You need to pass some arguments to updateProfile()");
+			} 
 		} else {
 			return sys.puts("updateProfile() requires you to be authenticated.");
 		}
@@ -1023,7 +1024,7 @@ exports.init.prototype = {
 		} else {
 			return sys.puts("notificationFollow() requires you to be authenticated.")
 		}
-	}.
+	},
 
 	notificationLeave: function(paramsObj, callbackfn) {
 		/*	notificationLeave(paramsObj, callbackfn)
@@ -1199,7 +1200,7 @@ exports.init.prototype = {
 				type: "GET",
 				url: "/blocks/blocking.json?page=" + (paramsObj.page ? paramsObj.page : "1"),
 				callback: callbackfn
-			}):
+			});
 		} else {
 			return sys.puts("getBlocking() requires you to be authenticated")
 		}
@@ -1283,7 +1284,7 @@ exports.init.prototype = {
 				date - Optional. Permits specifying a start date for the report. The date should be formatted YYYY-MM-DD.
 				exclude - Optional. Setting this equal to hashtags will remove all hashtags from the trends list.
 		*/
-		var apiURL = "/trends/daily.json?lol=1",
+		var apiURL = "/trends/daily.json?lol=1";
 		if(paramsObj.date) apiURL += "&date=" + paramsObj.date;
 		if(paramsObj.exclude) apiURL += "&exclude=" + paramsObj.exclude;
 		
@@ -1499,7 +1500,7 @@ exports.init.prototype = {
 		if(this.authenticated === true) {
 			return this.makeRequest({
 				type: "POST",
-				url: "/" + this.username + "/lists/" + paramsObj.list_id + ".json?_method=DELETE"
+				url: "/" + this.username + "/lists/" + paramsObj.list_id + ".json?_method=DELETE",
 				callback: callbackfn
 			});
 		} else {
@@ -1697,9 +1698,14 @@ exports.init.prototype = {
 				latitude (string) - Optional. A latitude to sort by.
 				longitude (string) - Optional. A longitude to sort by.
 		*/
-			if latitude is not None and longitude is not None:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/trends/available.json?latitude=%s&longitude=%s" % (version, latitude, longitude)))
-			return simplejson.load: function(.opener.open("http://api.twitter.com/%d/trends/available.json" % version))
+		var apiURL = "/trends/available.json";
+		if(!paramsObj.latitude || !paramsObj.longitude) apiURL = "/trends/available.json?latitude=" + paramsObj.latitude + "&longitude=" + paramsObj.longitude;
+
+		return this.makeRequest({
+			type: "GET",
+			url: apiURL,
+			callback: callbackfn
+		});
 	},
 
 	trendsByLocation: function(paramsObj, callbackfn) {
