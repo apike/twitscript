@@ -8,7 +8,8 @@
 */
 
 var sys = require("sys"),
-    http = require("http");
+    http = require("http"),
+	base64 = require("./vendor/base64");
 
 exports.init = function(setupObj) {
 	/*	new twitscript.init({username: "example", password: "example", headers: "example", version: 1})
@@ -32,11 +33,31 @@ exports.init = function(setupObj) {
 	this.search_opener = http.createClient(80, "search.twitter.com");
 
 	if(!this.version) this.version = 1;
-	if(!this.headers) this.headers = "Twitscript Node.js Client";
+	
+	this.headers = process.mixin({
+	    'Accept': '*/*',
+		'Host': 'api.twitter.com',
+		'User-Agent': 'Twitscript Node.js Client'
+	}, setupObj.headers || {});
 
 	if(this.username !== null && this.password !== null) {
-		// simplejson.load: function(.opener.open("http://api.twitter.com/%d/account/verify_credentials.json" % self.apiVersion))
-		// build opener
+		// Trust that what we got passed is correct; we'll verify it with a hit to verify_credentials.json
+		this.authenticated = true;
+
+		var auth = base64.encode(this.username + ':' + this.password),
+			that = this;
+		this.headers['Authorization'] = "Basic " + auth;
+
+		// Don't keep their password in memory...
+		this.password = "";
+		
+		this.makeRequest({
+			type: "GET",
+			url: "/account/verify_credentials.json",
+			callback: function(data) {
+				that.authenticated = true;
+			}
+		});
 	}
 }
 
@@ -51,8 +72,8 @@ exports.init.prototype = {
 			fullURL = reqObj.url;
 			request = this.search_opener.get(fullURL, {"host": "search.twitter.com", "User-Agent": this.headers});
 		}
-		else if(reqObj.type === "GET") request = this.opener.get(fullURL, {"host": "api.twitter.com", "User-Agent": this.headers});
-		else request = this.opener.put(fullURL, {"host": "api.twitter.com", "User-Agent": this.headers});
+		else if(reqObj.type === "GET") request = this.opener.get(fullURL, this.headers);
+		else request = this.opener.post(fullURL, this.headers);
 	
 		return request.finish(function(resp) {
 			var statusCode = resp.statusCode,
