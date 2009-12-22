@@ -29,6 +29,7 @@ exports.init = function(setupObj) {
 	
 	this.authenticated = false;
 	this.opener = http.createClient(80, "api.twitter.com");
+	this.search_opener = http.createClient(80, "search.twitter.com");
 
 	if(!this.version) this.version = 1;
 	if(!this.headers) this.headers = "Twitscript Node.js Client";
@@ -42,11 +43,16 @@ exports.init = function(setupObj) {
 exports.init.prototype = {	
 	makeRequest: function(reqObj) {
 		var request = null,
+			searchOpener = null,
 			fullURL = "/" + this.version + reqObj.url;
 
 		// Check for GET, assume POST (DELETE methods just append _method=DELETE for now)
-		if(reqObj.type === "GET") request = this.opener.get(fullURL, {"host": "api.twitter.com", "User-Agent": this.headers}); //, {"host": "www.google.com"});
-		else request = this.opener.put(fullURL, {"host": "api.twitter.com", "User-Agent": this.headers}); //, {"host": "www.google.com"});
+		if(reqObj.type === "SEARCH") {
+			fullURL = reqObj.url;
+			request = this.search_opener.get(fullURL, {"host": "search.twitter.com", "User-Agent": this.headers});
+		}
+		else if(reqObj.type === "GET") request = this.opener.get(fullURL, {"host": "api.twitter.com", "User-Agent": this.headers});
+		else request = this.opener.put(fullURL, {"host": "api.twitter.com", "User-Agent": this.headers});
 	
 		return request.finish(function(resp) {
 			var statusCode = resp.statusCode,
@@ -341,8 +347,8 @@ exports.init.prototype = {
 		}
 	},
 
-	searchUsers: function(q, per_page = 20, page = 1) {
-		""" searchUsers(q, per_page = None, page = None) {
+	searchUsers: function(paramsObj, callbackfn) {
+		/*	searchUsers(q, per_page = None, page = None) {
 
 			Query Twitter to find a set of users who match the criteria we have. (Note: This, oddly, requires authentication - go figure)
 
@@ -350,19 +356,23 @@ exports.init.prototype = {
 				q (string) - Required. The query you wanna search against; self explanatory. ;)
 				per_page (number) - Optional, defaults to 20. Specify the number of users Twitter should return per page (no more than 20, just fyi)
 				page (number) - Optional, defaults to 1. The page of users you want to pull down.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.per_page) paramsObj.per_page = 20;
+		if(!paramsObj.page) paramsObj.page = 1;
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/users/search.json?q=%s&per_page=%d&page=%d" % (version, q, per_page, page)))
-			except HTTPError, e:
-				raise TwythonError("searchUsers() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/users/search.json?q=" + paramsObj.q + "&per_page=" + paramsObj.per_page + "&page=" + paramsObj.page,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("searchUsers(), oddly, requires you to be authenticated.")
-	
-	showUser: function(id = None, user_id = None, screen_name = None) {
-		"""showUser(id = None, user_id = None, screen_name = None)
+		}
+	},
+
+	showUser: function(paramsObj, callbackfn) {
+		/*	showUser(id = None, user_id = None, screen_name = None)
 
 			Returns extended information of a given user.  The author's most recent status will be returned inline.
 
@@ -371,7 +381,6 @@ exports.init.prototype = {
 				id - The ID or screen name of a user.
 				user_id - Specfies the ID of the user to return. Helpful for disambiguating when a valid user ID is also a valid screen name.
 				screen_name - Specfies the screen name of the user to return. Helpful for disambiguating when a valid screen name is also a user ID.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
 
 			Usage Notes:
 			Requests for protected users without credentials from 
@@ -379,26 +388,22 @@ exports.init.prototype = {
 				2) a user that is following the protected user will omit the nested status element.
 
 			...will result in only publicly available data being returned.
-		"""
-		version = version or self.apiVersion
-		apiURL = ""
-		if id is not None:
-			apiURL = "http://api.twitter.com/%d/users/show/%s.json" % (version, id)
-		if user_id is not None:
-			apiURL = "http://api.twitter.com/%d/users/show.json?user_id=%s" % (version, `user_id`)
-		if screen_name is not None:
-			apiURL = "http://api.twitter.com/%d/users/show.json?screen_name=%s" % (version, screen_name)
-		if apiURL != "":
-			try:
-				if(this.authenticated === true) {
-					return simplejson.load: function(.opener.open(apiURL))
-				} else {
-					return simplejson.load: function(.opener.open(apiURL))
-			except HTTPError, e:
-				raise TwythonError("showUser() failed with a %s error code." % `e.code`, e.code)
-	
-	getFriendsStatus: function(id = None, user_id = None, screen_name = None, page = None, cursor="-1") {
-		"""getFriendsStatus(id = None, user_id = None, screen_name = None, page = None, cursor="-1")
+		*/
+		var apiURL = "";
+		if(paramsObj.id) apiURL = "/users/show/" + id + ".json";
+		else if(paramsObj.user_id) apiURL = "/users/show.json?user_id=" + user_id;
+		else if(paramsObj.screen_name) apiURL = "/users/show.json?screen_name=" + screen_name;
+		else return sys.puts("You need to specify an id, user_id, or screen_name for showUser()");
+
+		return makeRequest({
+			type: "GET",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
+
+	getFriendsStatus: function(paramsObj, callbackfn) {
+		/*	getFriendsStatus(paramsObj, callbackfn)
 
 			Returns a user's friends, each with current status inline. They are ordered by the order in which they were added as friends, 100 at a time. 
 			(Please note that the result set isn't guaranteed to be 100 every time, as suspended users will be filtered out.) Use the page option to access 
@@ -415,29 +420,26 @@ exports.init.prototype = {
 				screen_name - Optional. Specfies the screen name of the user for whom to return the list of friends. Helpful for disambiguating when a valid screen name is also a user ID.
 				page - (BEING DEPRECATED) Optional. Specifies the page of friends to receive.
 				cursor - Optional. Breaks the results into pages. A single page contains 100 users. This is recommended for users who are following many users. Provide a value of  -1 to begin paging. Provide values as returned to in the response body's next_cursor and previous_cursor attributes to page back and forth in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = ""
-			if id is not None:
-				apiURL = "http://api.twitter.com/%d/statuses/friends/%s.json" % (version, id)
-			if user_id is not None:
-				apiURL = "http://api.twitter.com/%d/statuses/friends.json?user_id=%s" % (version, `user_id`)
-			if screen_name is not None:
-				apiURL = "http://api.twitter.com/%d/statuses/friends.json?screen_name=%s" % (version, screen_name)
-			try:
-				if page is not None:
-					return simplejson.load: function(.opener.open(apiURL + "&page=%s" % `page`))
-				} else {
-					return simplejson.load: function(.opener.open(apiURL + "&cursor=%s" % cursor))
-			except HTTPError, e:
-				raise TwythonError("getFriendsStatus() failed with a %s error code." % `e.code`, e.code)
+			var apiURL = "";
+			if(paramsObj.id) apiURL = "/statuses/friends/" + paramsObj.id + ".json";
+			if(paramsObj.user_id) apiURL = "/statuses/friends.json?user_id=" + paramsObj.user_id;
+			if(paramsObj.screen_name) apiURL = "/statuses/friends.json?screen_name=" + paramsObj.screen_name;
+			else return sys.puts("You need to specify an id, user_id, or screen_name for getFriendsStatus()");
+			
+			return this.makeRequest({
+				type: "GET",
+				url: apiURL + (paramsObj.page ? "&page=" + paramsObj.page : "&cursor=" + paramsObj.cursor),
+				callback: callbackfn
+			});
 		} else {
-			return sys.puts("getFriendsStatus() requires you to be authenticated.")
+			return sys.puts("getFriendsStatus() requires you to be authenticated.");
+		}
+	},
 
-	getFollowersStatus: function(id = None, user_id = None, screen_name = None, page = None, cursor = "-1") {
-		"""getFollowersStatus(id = None, user_id = None, screen_name = None, page = None, cursor = "-1")
+	getFollowersStatus: function(paramsObj, callbackfn) {
+		/*	getFollowersStatus(paramsObj, callbackfn)
 
 			Returns the authenticating user's followers, each with current status inline.
 			They are ordered by the order in which they joined Twitter, 100 at a time.
@@ -454,49 +456,42 @@ exports.init.prototype = {
 				screen_name - Optional. Specfies the screen name of the user for whom to return the list of followers. Helpful for disambiguating when a valid screen name is also a user ID.
 				page - (BEING DEPRECATED) Optional. Specifies the page to retrieve.		
 				cursor - Optional. Breaks the results into pages. A single page contains 100 users. This is recommended for users who are following many users. Provide a value of  -1 to begin paging. Provide values as returned to in the response body's next_cursor and previous_cursor attributes to page back and forth in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = ""
-			if id is not None:
-				apiURL = "http://api.twitter.com/%d/statuses/followers/%s.json" % (version, id)
-			if user_id is not None:
-				apiURL = "http://api.twitter.com/%d/statuses/followers.json?user_id=%s" % (version, `user_id`)
-			if screen_name is not None:
-				apiURL = "http://api.twitter.com/%d/statuses/followers.json?screen_name=%s" % (version, screen_name)
-			try:
-				if page is not None:
-					return simplejson.load: function(.opener.open(apiURL + "&page=%s" % page))
-				} else {
-					return simplejson.load: function(.opener.open(apiURL + "&cursor=%s" % cursor))
-			except HTTPError, e:
-				raise TwythonError("getFollowersStatus() failed with a %s error code." % `e.code`, e.code)
+			var apiURL = "";
+			if(paramsObj.id) apiURL = "/statuses/followers/" + paramsObj.id + ".json";
+			if(paramsObj.user_id) apiURL = "/statuses/followers.json?user_id=" + paramsObj.user_id;
+			if(paramsObj.screen_name) apiURL = "/statuses/followers.json?screen_name=" + paramsObj.screen_name;
+			else return sys.puts("You need to specify an id, user_id, or screen_name for getFollowersStatus()");
+			
+			return this.makeRequest({
+				type: "GET",
+				url: apiURL + (paramsObj.page ? "&page=" + paramsObj.page : "&cursor=" + paramsObj.cursor),
+				callback: callbackfn
+			});
 		} else {
-			return sys.puts("getFollowersStatus() requires you to be authenticated.")
-	
-	showStatus: function(id) {
-		"""showStatus(id)
+			return sys.puts("getFollowersStatus() requires you to be authenticated.");
+		}
+	},
+
+	showStatus: function(paramsObj, callbackfn) {
+		/*	showStatus(paramsObj, callbackfn)
 
 			Returns a single status, specified by the id parameter below.
 			The status's author will be returned inline.
 
 			Parameters:
 				id - Required. The numerical ID of the status to retrieve.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			if(this.authenticated === true) {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/statuses/show/%s.json" % (version, id)))
-			} else {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/statuses/show/%s.json" % (version, id)))
-		except HTTPError, e:
-			raise TwythonError("Failed with a %s error code. Does this user hide/protect their updates? You'll need to authenticate and be friends to get their timeline." 
-				% `e.code`, e.code)
+		*/
+		return this.makeRequest({
+			type: "GET",
+			url: "/statuses/show/" + paramsObj.id + ".json",
+			callback: callbackfn
+		});
+	},
 
-	updateStatus: function(status, in_reply_to_status_id = None, latitude = None, longitude = None) {
-		"""updateStatus(status, in_reply_to_status_id = None)
+	updateStatus: function(paramsObj, callbackfn) {
+		/*	updateStatus(paramsObj, callbackfn)
 
 			Updates the authenticating user's status.  Requires the status parameter specified below.
 			A status update with text identical to the authenticating users current status will be ignored to prevent duplicates.
@@ -504,9 +499,8 @@ exports.init.prototype = {
 			Parameters:
 				status - Required. The text of your status update. URL encode as necessary. Statuses over 140 characters will be forceably truncated.
 				in_reply_to_status_id - Optional. The ID of an existing status that the update is in reply to.
-				latitude (string) - Optional. The location's latitude that this tweet refers to.
-				longitude (string) - Optional. The location's longitude that this tweet refers to.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
+				latitude - Optional. The location's latitude that this tweet refers to.
+				longitude - Optional. The location's longitude that this tweet refers to.
 
 				** Note: in_reply_to_status_id will be ignored unless the author of the tweet this parameter references
 				is mentioned within the status text. Therefore, you must include @username, where username is 
@@ -514,60 +508,71 @@ exports.init.prototype = {
  
 				** Note: valid ranges for latitude/longitude are, for example, -180.0 to +180.0 (East is positive) inclusive.  
 				This parameter will be ignored if outside that range, not a number, if geo_enabled is disabled, or if there not a corresponding latitude parameter with this tweet.
-		"""
-		version = version or self.apiVersion
-		if len(list(status)) > 140:
-			raise TwythonError("This status message is over 140 characters. Trim it down!")
-		try:
-			return simplejson.load: function(.opener.open("http://api.twitter.com/%d/statuses/update.json?" % version, urllib.urlencode({
-				"status": self.unicode2utf8(status), 
-				"in_reply_to_status_id": in_reply_to_status_id,
-				"lat": latitude,
-				"long": longitude
-			})))
-		except HTTPError, e:
-			raise TwythonError("updateStatus() failed with a %s error code." % `e.code`, e.code)
+		*/
+		if(!paramsObj.status) return sys.puts("You didn't provide a status message to update with. Wtf?");
 
-	destroyStatus: function(id) {
-		"""destroyStatus(id)
+		if(this.authenticated === true) {
+			var update = "/statuses/update.json?status=" + encodeURIComponent(paramsObj.status);
+			if(paramsObj.in_reply_to_status_id) update += "&in_reply_to_status_id=" + paramsObj.in_reply_to_status_id;
+			if(paramsObj.latitude && paramsObj.longitude) update += "&lat=" + paramsObj.latitude + "&long=" + longitude;
+			
+			return this.makeRequest({
+				type: "POST",
+				url: update,
+				callback: callbackfn
+			});
+		} else {
+			return sys.puts("You need to be authenticated to update a status.");
+		}
+	},
+
+	destroyStatus: function(paramsObj, callbackfn) {
+		/*	destroyStatus(paramsObj, callbackfn)
 
 			Destroys the status specified by the required ID parameter. 
 			The authenticating user must be the author of the specified status.
 
 			Parameters:
 				id - Required. The ID of the status to destroy.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You didn't specify an ID to delete.");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/status/destroy/%s.json" % (version, `id`), "DELETE"))
-			except HTTPError, e:
-				raise TwythonError("destroyStatus() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/status/destroy/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("destroyStatus() requires you to be authenticated.")
+		}
+	},
 
 	endSession: function() {
-		"""endSession()
+		/*	endSession()
 
 			Ends the session of the authenticating user, returning a null cookie. 
 			Use this method to sign users out of client-facing applications (widgets, etc).
 
+			NOTE: Returns nothing
+
 			Parameters:
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+				None
+		*/
 		if(this.authenticated === true) {
-			try:
-				self.opener.open("http://api.twitter.com/%d/account/end_session.json" % version, "")
-				this.authenticated = False
-			except HTTPError, e:
-				raise TwythonError("endSession failed with a %s error code." % `e.code`, e.code)
+			var that = this;
+			return this.makeRequest({
+				type: "POST",
+				url: "/account/end_session.json",
+				callback: function() { that.authenticated = false;
+			});
 		} else {
 			return sys.puts("You can't end a session when you're not authenticated to begin with.")
+		}
+	},
 
-	getDirectMessages: function(since_id = None, max_id = None, count = None, page = "1") {
-		"""getDirectMessages(since_id = None, max_id = None, count = None, page = "1")
+	getDirectMessages: function(paramsObj, callbackfn) {
+		/*	getDirectMessages(paramsObj, callbackfn)
 
 			Returns a list of the 20 most recent direct messages sent to the authenticating user. 
 
@@ -576,27 +581,25 @@ exports.init.prototype = {
 				max_id - Optional.  Returns only statuses with an ID less than (that is, older than) or equal to the specified ID. 
 				count - Optional.  Specifies the number of statuses to retrieve. May not be greater than 200.  
 				page - Optional. Specifies the page of results to retrieve. Note: there are pagination limits.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = "http://api.twitter.com/%d/direct_messages.json?page=%s" % (version, `page`)
-			if since_id is not None:
-				apiURL += "&since_id=%s" % `since_id`
-			if max_id is not None:
-				apiURL += "&max_id=%s" % `max_id`
-			if count is not None:
-				apiURL += "&count=%s" % `count`
+			var apiURL = "/direct_messages.json?page=" + (paramsObj.page ? paramsObj.page : 1);
+			if(paramsObj.since_id) apiURL += "&since_id=" paramsObj.since_id
+			if(paramsObj.max_id) apiURL += "&max_id=" + paramsObj.max_id
+			if(paramsObj.count) apiURL += "&count=" + paramsObj.count
 
-			try:
-				return simplejson.load: function(.opener.open(apiURL))
-			except HTTPError, e:
-				raise TwythonError("getDirectMessages() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: apiURL,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("getDirectMessages() requires you to be authenticated.")
+		}
+	},
 
-	getSentMessages: function(since_id = None, max_id = None, count = None, page = "1") {
-		"""getSentMessages(since_id = None, max_id = None, count = None, page = "1")
+	getSentMessages: function(paramsObj, callbackfn) {
+		/*	getSentMessages(paramsObj, callbackfn)
 
 			Returns a list of the 20 most recent direct messages sent by the authenticating user.
 
@@ -605,27 +608,25 @@ exports.init.prototype = {
 				max_id - Optional.  Returns only statuses with an ID less than (that is, older than) or equal to the specified ID. 
 				count - Optional.  Specifies the number of statuses to retrieve. May not be greater than 200.  
 				page - Optional. Specifies the page of results to retrieve. Note: there are pagination limits.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = "http://api.twitter.com/%d/direct_messages/sent.json?page=%s" % (version, `page`)
-			if since_id is not None:
-				apiURL += "&since_id=%s" % `since_id`
-			if max_id is not None:
-				apiURL += "&max_id=%s" % `max_id`
-			if count is not None:
-				apiURL += "&count=%s" % `count`
+			var apiURL = "/direct_messages/sent.json?page=" + (paramsObj.page ? paramsObj.page : 1);
+			if(paramsObj.since_id) apiURL += "&since_id=" + paramsObj.since_id;
+			if(paramsObj.max_id) apiURL += "&max_id=" + paramsObj.max_id;
+			if(paramsObj.count)	apiURL += "&count=" + paramsObj.count;
 
-			try:
-				return simplejson.load: function(.opener.open(apiURL))
-			except HTTPError, e:
-				raise TwythonError("getSentMessages() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: apiURL,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("getSentMessages() requires you to be authenticated.")
+		}
+	},
 
-	sendDirectMessage: function(user, text) {
-		"""sendDirectMessage(user, text)
+	sendDirectMessage: function(paramsObj, callbackfn) {
+		/*	sendDirectMessage(user, text)
 
 			Sends a new direct message to the specified user from the authenticating user. Requires both the user and text parameters. 
 			Returns the sent message in the requested format when successful.
@@ -633,41 +634,44 @@ exports.init.prototype = {
 			Parameters:
 				user - Required. The ID or screen name of the recipient user.
 				text - Required. The text of your direct message. Be sure to keep it under 140 characters.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.user || !paramsObj.text) return sys.puts("You need to specify both a user (ID or screen name) and the text you want to send in the direct message.");
+
 		if(this.authenticated === true) {
-			if len(list(text)) < 140:
-				try:
-					return self.opener.open("http://api.twitter.com/%d/direct_messages/new.json" % version, urllib.urlencode({"user": user, "text": text}))
-				except HTTPError, e:
-					raise TwythonError("sendDirectMessage() failed with a %s error code." % `e.code`, e.code)
-			} else {
-				raise TwythonError("Your message must not be longer than 140 characters")
+			return this.makeRequest({
+				type: "POST",
+				url: "/direct_messages/new.json?user=" + paramsObj.user + "&text=" + encodeURIComponent(paramsObj.text),
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("You must be authenticated to send a new direct message.")
+		}
+	},
 
-	destroyDirectMessage: function(id) {
-		"""destroyDirectMessage(id)
+	destroyDirectMessage: function(paramsObj, callbackfn) {
+		/*	destroyDirectMessage(id)
 
 			Destroys the direct message specified in the required ID parameter.
 			The authenticating user must be the recipient of the specified direct message.
 
 			Parameters:
 				id - Required. The ID of the direct message to destroy.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You need to specify an id of a direct message to destroy.");
+
 		if(this.authenticated === true) {
-			try:
-				return self.opener.open("http://api.twitter.com/%d/direct_messages/destroy/%s.json" % (version, id), "")
-			except HTTPError, e:
-				raise TwythonError("destroyDirectMessage() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/direct_messages/destroy/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("You must be authenticated to destroy a direct message.")
+		}
+	},
 
-	createFriendship: function(id = None, user_id = None, screen_name = None, follow = "false") {
-		"""createFriendship(id = None, user_id = None, screen_name = None, follow = "false")
+	createFriendship: function(paramsObj, callbackfn) {
+		/*	createFriendship(paramsObj, callbackfn)
 
 			Allows the authenticating users to follow the user specified in the ID parameter.
 			Returns the befriended user in the requested format when successful. Returns a
@@ -680,30 +684,26 @@ exports.init.prototype = {
 				user_id - Required. Specfies the ID of the user to befriend. Helpful for disambiguating when a valid user ID is also a valid screen name. 
 				screen_name - Required. Specfies the screen name of the user to befriend. Helpful for disambiguating when a valid screen name is also a user ID. 
 				follow - Optional. Enable notifications for the target user in addition to becoming friends. 
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = ""
-			if user_id is not None:
-				apiURL = "?user_id=%s&follow=%s" %(`user_id`, follow)
-			if screen_name is not None:
-				apiURL = "?screen_name=%s&follow=%s" %(screen_name, follow)
-			try:
-				if id is not None:
-					return simplejson.load: function(.opener.open("http://api.twitter.com/%d/friendships/create/%s.json" % (version, id), "?folow=%s" % follow))
-				} else {
-					return simplejson.load: function(.opener.open("http://api.twitter.com/%d/friendships/create.json" % version, apiURL))
-			except HTTPError, e:
-				# Rate limiting is done differently here for API reasons...
-				if e.code == 403:
-					raise APILimit("You've hit the update limit for this method. Try again in 24 hours.")
-				raise TwythonError("createFriendship() failed with a %s error code." % `e.code`, e.code)
+			var apiURL = "";
+			if(paramsObj.id) apiURL = "/friendships/create/" + paramsObj.id + ".json?follow=" + paramsObj.follow;
+			else if(paramsObj.user_id) apiURL = "/friendships/create.json?user_id=" + paramsObj.user_id + "&follow=" + paramsObj.follow;
+			else if(paramsObj.screen_name) apiURL = "/friendships/create.json?screen_name=" + paramsObj.screen_name + "&follow=" + paramsObj.follow;
+			else return sys.puts("You need to pass an id, user_id, or screen_name to createFriendship()");
+
+			return this.makeRequest({
+				type: "POST",
+				url: apiURL,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("createFriendship() requires you to be authenticated.")
+		}
+	},
 
-	destroyFriendship: function(id = None, user_id = None, screen_name = None) {
-		"""destroyFriendship(id = None, user_id = None, screen_name = None)
+	destroyFriendship: function(paramsObj, callbackfn) {
+		/*	destroyFriendship(paramsObj, callbackfn)
 
 			Allows the authenticating users to unfollow the user specified in the ID parameter.  
 			Returns the unfollowed user in the requested format when successful.  Returns a string describing the failure condition when unsuccessful.
@@ -714,26 +714,26 @@ exports.init.prototype = {
 				user_id - Required. Specfies the ID of the user to unfollow. Helpful for disambiguating when a valid user ID is also a valid screen name. 
 				screen_name - Required. Specfies the screen name of the user to unfollow. Helpful for disambiguating when a valid screen name is also a user ID.
 				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = ""
-			if user_id is not None:
-				apiURL = "?user_id=%s" % `user_id`
-			if screen_name is not None:
-				apiURL = "?screen_name=%s" % screen_name
-			try:
-				if id is not None:
-					return simplejson.load: function(.opener.open("http://api.twitter.com/%d/friendships/destroy/%s.json" % (version, `id`), "lol=1")) # Random string hack for POST reasons ;P
-				} else {
-					return simplejson.load: function(.opener.open("http://api.twitter.com/%d/friendships/destroy.json" % version, apiURL))
-			except HTTPError, e:
-				raise TwythonError("destroyFriendship() failed with a %s error code." % `e.code`, e.code)
+			var apiURL = "";
+			if(paramsObj.id) apiURL = "/friendships/destroy/" + paramsObj.id + ".json?follow=" + paramsObj.follow;
+			else if(paramsObj.user_id) apiURL = "/friendships/destroy.json?user_id=" + paramsObj.user_id + "&follow=" + paramsObj.follow;
+			else if(paramsObj.screen_name) apiURL = "/friendships/destroy.json?screen_name=" + paramsObj.screen_name + "&follow=" + paramsObj.follow;
+			else return sys.puts("You need to pass an id, user_id, or screen_name to destroyFriendship()");
+
+			return this.makeRequest({
+				type: "POST",
+				url: apiURL,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("destroyFriendship() requires you to be authenticated.")
-
-	checkIfFriendshipExists: function(user_a, user_b) {
-		"""checkIfFriendshipExists(user_a, user_b)
+		}
+	},
+	
+	checkIfFriendshipExists: function(paramsObj, callbackfn) {
+		/*	checkIfFriendshipExists(user_a, user_b)
 
 			Tests for the existence of friendship between two users.
 			Will return true if user_a follows user_b; otherwise, it'll return false.
@@ -741,20 +741,24 @@ exports.init.prototype = {
 			Parameters:
 				user_a - Required. The ID or screen_name of the subject user.
 				user_b - Required. The ID or screen_name of the user to test for following.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			try:
-				friendshipURL = "http://api.twitter.com/%d/friendships/exists.json?%s" % (version, urllib.urlencode({"user_a": user_a, "user_b": user_b}))
-				return simplejson.load: function(.opener.open(friendshipURL))
-			except HTTPError, e:
-				raise TwythonError("checkIfFriendshipExists() failed with a %s error code." % `e.code`, e.code)
+			if(paramsObj.user_a && paramsObj.user_b) {
+				return this.makeRequest({
+					type: "GET",
+					url: "/friendships/exists.json?user_a=" + paramsObj.user_a + "&user_b=" + paramsObj.user_b,
+					callback: callbackfn
+				});
+			} else {
+				return sys.puts("You need to pass both user_a and user_b to checkIfFriendshipExists()");
+			}
 		} else {
 			return sys.puts("checkIfFriendshipExists(), oddly, requires that you be authenticated.")
-	
-	showFriendship: function(source_id = None, source_screen_name = None, target_id = None, target_screen_name = None) {
-		"""showFriendship(source_id, source_screen_name, target_id, target_screen_name)
+		}
+	},
+
+	showFriendship: function(paramsObj, callbackfn) {
+		/*	showFriendship(paramsObj, callbackfn)
 
 			Returns detailed information about the relationship between two users. 
 
@@ -768,49 +772,44 @@ exports.init.prototype = {
 				target_screen_name - The screen_name of the target user.
 
 				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		apiURL = "http://api.twitter.com/%d/friendships/show.json?lol=1" % version # Another quick hack, look away if you want. :D
-		if source_id is not None:
-			apiURL += "&source_id=%s" % `source_id`
-		if source_screen_name is not None:
-			apiURL += "&source_screen_name=%s" % source_screen_name
-		if target_id is not None:
-			apiURL += "&target_id=%s" % `target_id`
-		if target_screen_name is not None:
-			apiURL += "&target_screen_name=%s" % target_screen_name
-		try:
-			if(this.authenticated === true) {
-				return simplejson.load: function(.opener.open(apiURL))
-			} else {
-				return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			# Catch this for now
-			if e.code == 403:
-				return sys.puts("You're unauthenticated, and forgot to pass a source for this method. Try again!")
-			raise TwythonError("showFriendship() failed with a %s error code." % `e.code`, e.code)
+		*/
+		var apiURL = "/friendships/show.json?lol=1"; // # A quick hack, look away if you want. ;D
+		if(paramsObj.source_id)	apiURL += "&source_id=" + paramsObj.source_id;
+		if(paramsObj.source_screen_name) apiURL += "&source_screen_name=" + paramsObj.source_screen_name;
+		if(paramsObj.target_id) apiURL += "&target_id=" + paramsObj.target_id;
+		if(paramsObj.target_screen_name) apiURL += "&target_screen_name=" + paramsObj.target_screen_name;
 	
-	updateDeliveryDevice: function(device_name = "none") {
-		"""updateDeliveryDevice(device_name = "none")
+		return this.makeRequest({
+			type: "GET",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
+
+	updateDeliveryDevice: function(paramsObj, callbackfn) {
+		/*	updateDeliveryDevice(device_name = "none")
 
 			Sets which device Twitter delivers updates to for the authenticating user.
 			Sending "none" as the device parameter will disable IM or SMS updates. (Simply calling .updateDeliveryService() also accomplishes this)
 
 			Parameters:
 				device - Required. Must be one of: sms, im, none.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.device) return sys.puts("You need to specify a device (\"sms\", \"im\", \"none\") for updateDeliveryService");
+		
 		if(this.authenticated === true) {
-			try:
-				return self.opener.open("http://api.twitter.com/%d/account/update_delivery_device.json?" % version, urllib.urlencode({"device": self.unicode2utf8(device_name)}))
-			except HTTPError, e:
-				raise TwythonError("updateDeliveryDevice() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/account/update_delivery_device.json?device=" + paramsObj.device,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("updateDeliveryDevice() requires you to be authenticated.")
+		}
+	},
 
-	updateProfileColors: function(, paramsObj) {
-		"""updateProfileColors(paramsObj)
+	updateProfileColors: function(paramsObj, callbackfn) {
+		/*	updateProfileColors(paramsObj)
 
 			Sets one or more hex values that control the color scheme of the authenticating user's profile page on api.twitter.com.
 
@@ -823,20 +822,20 @@ exports.init.prototype = {
 				profile_link_color - Optional.
 				profile_sidebar_fill_color - Optional.
 				profile_sidebar_border_color - Optional.
-
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			try:
-				return self.opener.open: function(.constructApiURL("http://api.twitter.com/%d/account/update_profile_colors.json?" % version, paramsObj))
-			except HTTPError, e:
-				raise TwythonError("updateProfileColors() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: this.constructApiURL("/account/update_profile_colors.json", paramsObj),
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("updateProfileColors() requires you to be authenticated.")
+		}
+	},
 
-	updateProfile: function(name = None, email = None, url = None, location = None, description = None) {
-		"""updateProfile(name = None, email = None, url = None, location = None, description = None)
+	updateProfile: function(paramsObj, callbackfn) {
+		/*	updateProfile(paramsObj, callbackfn)
 
 			Sets values that users are able to set under the "Account" tab of their settings page. 
 			Only the parameters specified will be updated.
@@ -850,119 +849,150 @@ exports.init.prototype = {
 				url - Optional. Maximum of 100 characters. Will be prepended with "http://" if not present.
 				location - Optional. Maximum of 30 characters. The contents are not normalized or geocoded in any way.
 				description - Optional. Maximum of 160 characters.
-
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		var useAmpersands = false,
+			updateProfileQueryString = "";
+		
 		if(this.authenticated === true) {
-			useAmpersands = False
-			updateProfileQueryString = ""
-			if name is not None:
-				if len(list(name)) < 20:
-					updateProfileQueryString += "name=" + name
-					useAmpersands = True
+			
+			if(paramsObj.name) {
+				if(paramsObj.name.split("").length < 20) {
+					updateProfileQueryString += "name=" + paramsObj.name;
+					useAmpersands = true;
 				} else {
-					raise TwythonError("Twitter has a character limit of 20 for all usernames. Try again.")
-			if email is not None and "@" in email:
-				if len(list(email)) < 40:
-					if useAmpersands is True:
-						updateProfileQueryString += "&email=" + email
+					return sys.puts("Twitter has a character limit of 20 for all usernames. Try again.");
+				}
+			}
+			
+			if(paramsObj.email && paramsObj.email.indexOf("@") > 0) {
+				if(paramsObj.email.split("").length < 40) {
+					if(useAmpersands) {
+						updateProfileQueryString += "&email=" + paramsObj.email;
 					} else {
-						updateProfileQueryString += "email=" + email
-						useAmpersands = True
+						updateProfileQueryString += "email=" + paramsObj.email;
+						useAmpersands = true;
+					}
 				} else {
-					raise TwythonError("Twitter has a character limit of 40 for all email addresses, and the email address must be valid. Try again.")
-			if url is not None:
-				if len(list(url)) < 100:
-					if useAmpersands is True:
-						updateProfileQueryString += "&" + urllib.urlencode({"url": self.unicode2utf8(url)})
+					return sys.puts("Twitter has a character limit of 40 for all email addresses, and the email address must be valid. Try again.");
+				}
+			}
+			
+			if(paramsObj.url) {
+				if(paramsObj.url.split("").length < 100) {
+					if(useAmpersands) {
+						updateProfileQueryString += "&url=" + encodeURIComponent(paramsObj.url);
 					} else {
-						updateProfileQueryString += urllib.urlencode({"url": self.unicode2utf8(url)})
-						useAmpersands = True
+						updateProfileQueryString += "?url=" + encodeURIComponent(paramsObj.url);
+						useAmpersands = true;
+					}
 				} else {
-					raise TwythonError("Twitter has a character limit of 100 for all urls. Try again.")
-			if location is not None:
-				if len(list(location)) < 30:
-					if useAmpersands is True:
-						updateProfileQueryString += "&" + urllib.urlencode({"location": self.unicode2utf8(location)})
-					} else {
-						updateProfileQueryString += urllib.urlencode({"location": self.unicode2utf8(location)})
-						useAmpersands = True
-				} else {
-					raise TwythonError("Twitter has a character limit of 30 for all locations. Try again.")
-			if description is not None:
-				if len(list(description)) < 160:
-					if useAmpersands is True:
-						updateProfileQueryString += "&" + urllib.urlencode({"description": self.unicode2utf8(description)})
-					} else {
-						updateProfileQueryString += urllib.urlencode({"description": self.unicode2utf8(description)})
-				} else {
-					raise TwythonError("Twitter has a character limit of 160 for all descriptions. Try again.")
+					return sys.puts("Twitter has a character limit of 100 for all urls. Try again.");
+				}
+			}
 
-			if updateProfileQueryString != "":
-				try:
-					return self.opener.open("http://api.twitter.com/%d/account/update_profile.json?" % version, updateProfileQueryString)
-				except HTTPError, e:
-					raise TwythonError("updateProfile() failed with a %s error code." % `e.code`, e.code)
+			if(paramsObj.location) {
+				if(paramsObj.location.split("").length < 30) {
+					if(useAmpersands) {
+						updateProfileQueryString += "&location=" + encodeURIComponent(paramsObj.location);
+					} else {
+						updateProfileQueryString += "?location=" + encodeURIComponent(paramsObj.location);
+						useAmpersands = true;
+					}
+				} else {
+					return sys.puts("Twitter has a character limit of 30 for all locations. Try again.");
+				}
+			}
+
+			if(paramsObj.description) {
+				if(paramsObj.description.split("").length < 160) {
+					if(useAmpersands) {
+						updateProfileQueryString += "&description=" + encodeURIComponent(paramsObj.description);
+					} else {
+						updateProfileQueryString += "?description=" + encodeURIComponent(paramsObj.description);
+					}
+				} else {
+					return sys.puts("Twitter has a character limit of 160 for all descriptions. Try again.");
+				}
+			}
+
+			if(updateProfileQueryString !== "") {
+				return this.makeRequest({
+					type: "POST",
+					url: "/account/update_profile.json" + updateProfileQueryString,
+					callback: callbackfn
+				});
+			} else {
+				return sys.puts("You need to pass some arguments to updateProfile()");
 		} else {
-			return sys.puts("updateProfile() requires you to be authenticated.")
+			return sys.puts("updateProfile() requires you to be authenticated.");
+		}
+	},
 
-	getFavorites: function(page = "1") {
-		"""getFavorites(page = "1")
+	getFavorites: function(paramsObj, callbackfn) {
+		/*	getFavorites(paramsObj, callbackfn)
 
 			Returns the 20 most recent favorite statuses for the authenticating user or user specified by the ID parameter in the requested format.
 
 			Parameters:
 				page - Optional. Specifies the page of favorites to retrieve.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.page) paramsObj.page = 1;
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/favorites.json?page=%s" % (version, `page`)))
-			except HTTPError, e:
-				raise TwythonError("getFavorites() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/favorites.json?page=" + paramsObj.page,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("getFavorites() requires you to be authenticated.")
+		}
+	},
 
-	createFavorite: function(id) {
-		"""createFavorite(id)
+	createFavorite: function(paramsObj, callbackfn) {
+		/*	createFavorite(paramsObj, callbackfn)
 
 			Favorites the status specified in the ID parameter as the authenticating user. Returns the favorite status when successful.
 
 			Parameters:
 				id - Required. The ID of the status to favorite.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You didn't pass an ID to createFavorite()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/favorites/create/%s.json" % (version, `id`), ""))
-			except HTTPError, e:
-				raise TwythonError("createFavorite() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/favorites/create/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("createFavorite() requires you to be authenticated.")
+		}
+	},
 
-	destroyFavorite: function(id) {
-		"""destroyFavorite(id)
+	destroyFavorite: function(paramsObj, callbackfn) {
+		/*	destroyFavorite(paramsObj, callbackfn)
 
 			Un-favorites the status specified in the ID parameter as the authenticating user. Returns the un-favorited status in the requested format when successful.
 
 			Parameters:
 				id - Required. The ID of the status to un-favorite.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You didn't pass an ID to destroyFavorite()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/favorites/destroy/%s.json" % (version, `id`), ""))
-			except HTTPError, e:
-				raise TwythonError("destroyFavorite() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/favorites/destroy/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("destroyFavorite() requires you to be authenticated.")
+		}
+	},
 
-	notificationFollow: function(id = None, user_id = None, screen_name = None) {
-		"""notificationFollow(id = None, user_id = None, screen_name = None)
+	notificationFollow: function(paramsObj, callbackfn) {
+		/*	notificationFollow(paramsObj, callbackfn)
 
 			Enables device notifications for updates from the specified user. Returns the specified user when successful.
 
@@ -971,26 +1001,26 @@ exports.init.prototype = {
 				id - Required. The ID or screen name of the user to follow with device updates.
 				user_id - Required. Specfies the ID of the user to follow with device updates. Helpful for disambiguating when a valid user ID is also a valid screen name. 
 				screen_name - Required. Specfies the screen name of the user to follow with device updates. Helpful for disambiguating when a valid screen name is also a user ID. 
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = ""
-			if id is not None:
-				apiURL = "http://api.twitter.com/%d/notifications/follow/%s.json" % (version, id)
-			if user_id is not None:
-				apiURL = "http://api.twitter.com/%d/notifications/follow/follow.json?user_id=%s" % (version, `user_id`)
-			if screen_name is not None:
-				apiURL = "http://api.twitter.com/%d/notifications/follow/follow.json?screen_name=%s" % (version, screen_name)
-			try:
-				return simplejson.load: function(.opener.open(apiURL, ""))
-			except HTTPError, e:
-				raise TwythonError("notificationFollow() failed with a %s error code." % `e.code`, e.code)
+			var apiURL = ""
+			if(paramsObj.id) apiURL = "/notifications/follow/" + paramsObj.id + ".json";
+			else if(paramsObj.user_id) apiURL = "/notifications/follow/follow.json?user_id=" + paramsObj.user_id;
+			else if(paramsObj.screen_name) apiURL = "/notifications/follow/follow.json?screen_name=" + paramsObj.screen_name
+			else return sys.puts("You need to pass an id, user_id, or screen_name to notificationFollow()");
+
+			return this.makeRequest({
+				type: "POST",
+				url: apiURL,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("notificationFollow() requires you to be authenticated.")
+		}
+	}.
 
-	notificationLeave: function(id = None, user_id = None, screen_name = None) {
-		"""notificationLeave(id = None, user_id = None, screen_name = None)
+	notificationLeave: function(paramsObj, callbackfn) {
+		/*	notificationLeave(paramsObj, callbackfn)
 
 			Disables notifications for updates from the specified user to the authenticating user.  Returns the specified user when successful.
 
@@ -999,26 +1029,26 @@ exports.init.prototype = {
 				id - Required. The ID or screen name of the user to follow with device updates.
 				user_id - Required. Specfies the ID of the user to follow with device updates. Helpful for disambiguating when a valid user ID is also a valid screen name. 
 				screen_name - Required. Specfies the screen name of the user to follow with device updates. Helpful for disambiguating when a valid screen name is also a user ID. 
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			apiURL = ""
-			if id is not None:
-				apiURL = "http://api.twitter.com/%d/notifications/leave/%s.json" % (version, id)
-			if user_id is not None:
-				apiURL = "http://api.twitter.com/%d/notifications/leave/leave.json?user_id=%s" % (version, `user_id`)
-			if screen_name is not None:
-				apiURL = "http://api.twitter.com/%d/notifications/leave/leave.json?screen_name=%s" % (version, screen_name)
-			try:
-				return simplejson.load: function(.opener.open(apiURL, ""))
-			except HTTPError, e:
-				raise TwythonError("notificationLeave() failed with a %s error code." % `e.code`, e.code)
+			var apiURL = "";
+			if(paramsObj.id) apiURL = "/notifications/leave/" + paramsObj.id + ".json";
+			else if(paramsObj.user_id) apiURL = "/notifications/leave/leave.json?user_id=" + paramsObj.user_id;
+			else if(paramsObj.screen_name) apiURL = "/notifications/leave/leave.json?screen_name=" + paramsObj.screen_name;
+			else return sys.puts("You need to pass an id, user_id, or screen_name to notificationLeave()");
+
+			return this.makeRequest({
+				type: "POST",
+				url: apiURL,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("notificationLeave() requires you to be authenticated.")
+		}
+	},
 
-	getFriendsIDs: function(id = None, user_id = None, screen_name = None, page = None, cursor = "-1") {
-		"""getFriendsIDs(id = None, user_id = None, screen_name = None, page = None, cursor = "-1")
+	getFriendsIDs: function(paramsObj, callbackfn) {
+		/*	getFriendsIDs(paramsObj, callbackfn)
 
 			Returns an array of numeric IDs for every user the specified user is following.
 
@@ -1031,26 +1061,26 @@ exports.init.prototype = {
 				screen_name - Required. Specfies the screen name of the user to follow with device updates. Helpful for disambiguating when a valid screen name is also a user ID. 
 				page - (BEING DEPRECATED) Optional. Specifies the page number of the results beginning at 1. A single page contains up to 5000 ids. This is recommended for users with large ID lists. If not provided all ids are returned. (Please note that the result set isn't guaranteed to be 5000 every time as suspended users will be filtered out.)
 				cursor - Optional. Breaks the results into pages. A single page contains 5000 ids. This is recommended for users with large ID lists. Provide a value of -1 to begin paging. Provide values as returned to in the response body's "next_cursor" and "previous_cursor" attributes to page back and forth in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		apiURL = ""
-		breakResults = "cursor=%s" % cursor
-		if page is not None:
-			breakResults = "page=%s" % page
-		if id is not None:
-			apiURL = "http://api.twitter.com/%d/friends/ids/%s.json?%s" %(version, id, breakResults)
-		if user_id is not None:
-			apiURL = "http://api.twitter.com/%d/friends/ids.json?user_id=%s&%s" %(version, `user_id`, breakResults)
-		if screen_name is not None:
-			apiURL = "http://api.twitter.com/%d/friends/ids.json?screen_name=%s&%s" %(version, screen_name, breakResults)
-		try:
-			return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			raise TwythonError("getFriendsIDs() failed with a %s error code." % `e.code`, e.code)
+		*/
+		var apiURL = "",
+			breakResults = "cursor=" + (paramsObj.cursor ? paramsObj.cursor : "-1");
+		
+		if(paramsObj.page) breakResults = "page=" + paramsObj.page;
+		
+		if(paramsObj.id) apiURL = "/friends/ids/" + paramsObj.id + ".json?lol=1";
+		else if(paramsObj.user_id) apiURL = "/friends/ids.json?user_id=" + paramsObj.user_id;
+		else if(paramsObj.screen_name) apiURL = "/friends/ids.json?screen_name=" + paramsObj.screen_name;
+		else return sys.puts("You need to pass an id, user_id, or screen_name to getFriendsIDs()");
 
-	getFollowersIDs: function(id = None, user_id = None, screen_name = None, page = None, cursor = "-1") {
-		"""getFollowersIDs(id = None, user_id = None, screen_name = None, page = None, cursor = "-1")
+		return this.makeRequest({
+			type: "GET",
+			url: apiURL + "&" + breakResults,
+			callback: callbackfn
+		});
+	},
+
+	getFollowersIDs: function(paramsObj, callbackfn) {
+		/*	getFollowersIDs(paramsObj, callbackfn)
 
 			Returns an array of numeric IDs for every user following the specified user.
 
@@ -1063,64 +1093,70 @@ exports.init.prototype = {
 				screen_name - Required. Specfies the screen name of the user to follow with device updates. Helpful for disambiguating when a valid screen name is also a user ID. 
 				page - (BEING DEPRECATED) Optional. Specifies the page number of the results beginning at 1. A single page contains 5000 ids. This is recommended for users with large ID lists. If not provided all ids are returned. (Please note that the result set isn't guaranteed to be 5000 every time as suspended users will be filtered out.)
 				cursor - Optional. Breaks the results into pages. A single page contains 5000 ids. This is recommended for users with large ID lists. Provide a value of -1 to begin paging. Provide values as returned to in the response body's "next_cursor" and "previous_cursor" attributes to page back and forth in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		apiURL = ""
-		breakResults = "cursor=%s" % cursor
-		if page is not None:
-			breakResults = "page=%s" % page
-		if id is not None:
-			apiURL = "http://api.twitter.com/%d/followers/ids/%s.json?%s" % (version, `id`, breakResults)
-		if user_id is not None:
-			apiURL = "http://api.twitter.com/%d/followers/ids.json?user_id=%s&%s" %(version, `user_id`, breakResults)
-		if screen_name is not None:
-			apiURL = "http://api.twitter.com/%d/followers/ids.json?screen_name=%s&%s" %(version, screen_name, breakResults)
-		try:
-			return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			raise TwythonError("getFollowersIDs() failed with a %s error code." % `e.code`, e.code)
+		*/
+		var apiURL = "",
+			breakResults = "cursor=" (paramsObj.cursor ? paramsObj.cursor : "-1");
+			
+		if(paramsObj.page) breakResults = "page=" + paramsObj.page;
+		
+		if(paramsObj.id) apiURL = "/followers/ids/" + paramsObj.id + ".json?lol=1";
+		else if(paramsObj.user_id) apiURL = "/followers/ids.json?user_id=" + paramsObj.user_id;
+		else if(paramsObj.screen_name) apiURL = "/followers/ids.json?screen_name=" + paramsObj.screen_name;
+		else return sys.puts("You need to pass an id, user_id, or screen_name to getFollowersIDs()");
 
-	createBlock: function(id) {
-		"""createBlock(id)
+		return this.makeRequest({
+			type: "GET",
+			url: apiURL + "&" + breakResults,
+			callback: callbackfn
+		});
+	},
+	
+	createBlock: function(paramsObj, callbackfn) {
+		/*	createBlock(paramsObj, callbackfn)
 
 			Blocks the user specified in the ID parameter as the authenticating user. Destroys a friendship to the blocked user if it exists. 
 			Returns the blocked user in the requested format when successful.
 
 			Parameters:
 				id - The ID or screen name of a user to block.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You didn't pass an id to createBlock()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/blocks/create/%s.json" % (version, `id`), ""))
-			except HTTPError, e:
-				raise TwythonError("createBlock() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/blocks/create/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("createBlock() requires you to be authenticated.")
+		}
+	},
 
-	destroyBlock: function(id) {
-		"""destroyBlock(id)
+	destroyBlock: function(paramsObj, callbackfn) {
+		/*	destroyBlock(paramsObj, callbackfn)
 
 			Un-blocks the user specified in the ID parameter for the authenticating user.
 			Returns the un-blocked user in the requested format when successful.
 
 			Parameters:
 				id - Required. The ID or screen_name of the user to un-block
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You didn't pass an id to destroyBlock()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/blocks/destroy/%s.json" % (version, `id`), ""))
-			except HTTPError, e:
-				raise TwythonError("destroyBlock() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/blocks/destroy/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("destroyBlock() requires you to be authenticated.")
+		}
+	},
 
-	checkIfBlockExists: function(id = None, user_id = None, screen_name = None) {
-		"""checkIfBlockExists(id = None, user_id = None, screen_name = None)
+	checkIfBlockExists: function(paramsObj, callbackfn) {
+		/*	checkIfBlockExists(paramsObj, callbackfn)
 
 			Returns if the authenticating user is blocking a target user. Will return the blocked user's object if a block exists, and 
 			error with an HTTP 404 response code otherwise.
@@ -1130,58 +1166,60 @@ exports.init.prototype = {
 				id - Optional. The ID or screen_name of the potentially blocked user.
 				user_id - Optional. Specfies the ID of the potentially blocked user. Helpful for disambiguating when a valid user ID is also a valid screen name.
 				screen_name - Optional. Specfies the screen name of the potentially blocked user. Helpful for disambiguating when a valid screen name is also a user ID.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		apiURL = ""
-		if id is not None:
-			apiURL = "http://api.twitter.com/%d/blocks/exists/%s.json" % (version, `id`)
-		if user_id is not None:
-			apiURL = "http://api.twitter.com/%d/blocks/exists.json?user_id=%s" % (version, `user_id`)
-		if screen_name is not None:
-			apiURL = "http://api.twitter.com/%d/blocks/exists.json?screen_name=%s" % (version, screen_name)
-		try:
-			return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			raise TwythonError("checkIfBlockExists() failed with a %s error code." % `e.code`, e.code)
+		*/
+		var apiURL = "";
+		if(paramsObj.id) apiURL = "/blocks/exists/" + paramsObj.id + ".json";
+		else if(paramsObj.user_id) apiURL = "/blocks/exists.json?user_id=" + paramsObj.user_id
+		else if(paramsObj.screen_name) apiURL = "/blocks/exists.json?screen_name=" + paramsObj.screen_name;
+		else return sys.puts("You need to pass an id, user_id, or screen_name to checkIfBlockExists()");
+		
+		return this.makeRequest({
+			type: "GET",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
 
-	getBlocking: function(page = "1") {
-		"""getBlocking(page = "1")
+	getBlocking: function(paramsObj, callbackfn) {
+		/*	getBlocking(paramsObj, callbackfn)
 
 			Returns an array of user objects that the authenticating user is blocking.
 
 			Parameters:
 				page - Optional. Specifies the page number of the results beginning at 1. A single page contains 20 ids.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/blocks/blocking.json?page=%s" % (version, `page`)))
-			except HTTPError, e:
-				raise TwythonError("getBlocking() failed with a %s error code." %	`e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/blocks/blocking.json?page=" + (paramsObj.page ? paramsObj.page : "1"),
+				callback: callbackfn
+			}):
 		} else {
 			return sys.puts("getBlocking() requires you to be authenticated")
+		}
+	},
 
-	getBlockedIDs: function() {
-		"""getBlockedIDs()
+	getBlockedIDs: function(callbackfn) {
+		/*	getBlockedIDs()
 
 			Returns an array of numeric user ids the authenticating user is blocking.
 
 			Parameters:
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+				None
+		*/
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/blocks/blocking/ids.json" % version))
-			except HTTPError, e:
-				raise TwythonError("getBlockedIDs() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/blocks/blocking/ids.json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("getBlockedIDs() requires you to be authenticated.")
+		}
+	},
 
-	searchTwitter: function(search_query, paramsObj) {
-		"""searchTwitter(search_query, paramsObj)
+	searchTwitter: function(paramsObj, callbackfn) {
+		/*	searchTwitter(search_query, paramsObj)
 
 			Returns tweets that match a specified query.
 
@@ -1204,150 +1242,155 @@ exports.init.prototype = {
 			Applications must have a meaningful and unique User Agent when using this method. 
 			An HTTP Referrer is expected but not required. Search traffic that does not include a User Agent will be rate limited to fewer API calls per hour than 
 			applications including a User Agent string. You can set your custom UA headers by passing it as a respective argument to the setup() method.
-		"""
-		searchURL = this.constructApiURL("http://search.twitter.com/search.json", paramsObj) + "&" + urllib.urlencode({"q": self.unicode2utf8(search_query)})
-		try:
-			return simplejson.load: function(.opener.open(searchURL))
-		except HTTPError, e:
-			raise TwythonError("getSearchTimeline() failed with a %s error code." % `e.code`, e.code)
+		*/
+		return this.makeRequest({
+			type: "SEARCH",
+			url: this.constructApiURL("/search.json", paramsObj),
+			callback: callbackfn
+		});
+	},
 
-	getCurrentTrends: function(excludeHashTags = False) {
-		"""getCurrentTrends(excludeHashTags = False)
+	getCurrentTrends: function(paramsObj, callbackfn) {
+		/*	getCurrentTrends(paramsObj, callbackfn)
 
 			Returns the current top 10 trending topics on Twitter.  The response includes the time of the request, the name of each trending topic, and the query used 
 			on Twitter Search results page for that topic.
 
 			Parameters:
-				excludeHashTags - Optional. Setting this equal to hashtags will remove all hashtags from the trends list.
-		"""
-		apiURL = "http://search.twitter.com/trends/current.json"
-		if excludeHashTags is True:
-			apiURL += "?exclude=hashtags"
-		try:
-			return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			raise TwythonError("getCurrentTrends() failed with a %s error code." % `e.code`, e.code)
+				exclude - Optional. Setting this equal to hashtags will remove all hashtags from the trends list.
+		*/
+		var apiURL = "/trends/current.json";
+		if(paramsObj.exclude) apiURL += "?exclude=" + paramsObj.exclude;
+		return this.makeRequest({
+			type: "SEARCH",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
 
-	getDailyTrends: function(date = None, exclude = False) {
-		"""getDailyTrends(date = None, exclude = False)
+	getDailyTrends: function(paramsObj, callbackfn) {
+		/*	getDailyTrends(paramsObj, callbackfn)
 
 			Returns the top 20 trending topics for each hour in a given day.
 
 			Parameters:
 				date - Optional. Permits specifying a start date for the report. The date should be formatted YYYY-MM-DD.
 				exclude - Optional. Setting this equal to hashtags will remove all hashtags from the trends list.
-		"""
-		apiURL = "http://search.twitter.com/trends/daily.json"
-		questionMarkUsed = False
-		if date is not None:
-			apiURL += "?date=%s" % date
-			questionMarkUsed = True
-		if exclude is True:
-			if questionMarkUsed is True:
-				apiURL += "&exclude=hashtags"
-			} else {
-				apiURL += "?exclude=hashtags"
-		try:
-			return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			raise TwythonError("getDailyTrends() failed with a %s error code." % `e.code`, e.code)
+		*/
+		var apiURL = "/trends/daily.json?lol=1",
+		if(paramsObj.date) apiURL += "&date=" + paramsObj.date;
+		if(paramsObj.exclude) apiURL += "&exclude=" + paramsObj.exclude;
+		
+		return this.makeRequest({
+			type: "SEARCH",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
 
-	getWeeklyTrends: function(date = None, exclude = False) {
-		"""getWeeklyTrends(date = None, exclude = False)
+	getWeeklyTrends: function(paramsObj, callbackfn) {
+		/*	getWeeklyTrends(paramsObj, callbackfn)
 
 			Returns the top 30 trending topics for each day in a given week.
 
 			Parameters:
 				date - Optional. Permits specifying a start date for the report. The date should be formatted YYYY-MM-DD.
 				exclude - Optional. Setting this equal to hashtags will remove all hashtags from the trends list.
-		"""
-		apiURL = "http://search.twitter.com/trends/daily.json"
-		questionMarkUsed = False
-		if date is not None:
-			apiURL += "?date=%s" % date
-			questionMarkUsed = True
-		if exclude is True:
-			if questionMarkUsed is True:
-				apiURL += "&exclude=hashtags"
-			} else {
-				apiURL += "?exclude=hashtags"
-		try:
-			return simplejson.load: function(.opener.open(apiURL))
-		except HTTPError, e:
-			raise TwythonError("getWeeklyTrends() failed with a %s error code." % `e.code`, e.code)
+		*/
+		var apiURL = "/trends/daily.json"
+		if(paramsObj.date) apiURL += "?date=" + paramsObj.date;
+		if(paramsObj.exclude) apiURL += "&exclude=" + paramsObj.exclude;
+		
+		return this.makeRequest({
+			type: "SEARCH",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
 
-	getSavedSearches: function() {
-		"""getSavedSearches()
+	getSavedSearches: function(callbackfn) {
+		/*	getSavedSearches(callbackfn)
 
 			Returns the authenticated user's saved search queries.
 
 			Parameters:
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+				None
+		*/
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/saved_searches.json" % version))
-			except HTTPError, e:
-				raise TwythonError("getSavedSearches() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/saved_searches.json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("getSavedSearches() requires you to be authenticated.")
-
-	showSavedSearch: function(id) {
-		"""showSavedSearch(id)
+		}
+	},
+	
+	showSavedSearch: function(paramsObj, callbackfn) {
+		/*	showSavedSearch(id)
 
 			Retrieve the data for a saved search owned by the authenticating user specified by the given id.
 
 			Parameters:
 				id - Required. The id of the saved search to be retrieved.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You need to pass an id to showSavedSearch()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/saved_searches/show/%s.json" % (version, `id`)))
-			except HTTPError, e:
-				raise TwythonError("showSavedSearch() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/saved_searches/show/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("showSavedSearch() requires you to be authenticated.")
+		}
+	},
 
-	createSavedSearch: function(query) {
-		"""createSavedSearch(query)
+	createSavedSearch: function(paramsObj, callbackfn) {
+		/*	createSavedSearch(paramsObj, callbackfn)
 
 			Creates a saved search for the authenticated user.
 
 			Parameters:
 				query - Required. The query of the search the user would like to save.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.query) return sys.puts("You need to pass a query to save, dude.");
+		
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/saved_searches/create.json?query=%s" % (version, query), ""))
-			except HTTPError, e:
-				raise TwythonError("createSavedSearch() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/saved_searches/create.json?query=" + paramsObj.query,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("createSavedSearch() requires you to be authenticated.")
+		}
+	},
 
-	destroySavedSearch: function(id) {
-		""" destroySavedSearch(id)
+	destroySavedSearch: function(paramsObj, callbackfn) {
+		/*	destroySavedSearch(paramsObj, callbackfn)
 
 			Destroys a saved search for the authenticated user.
 			The search specified by id must be owned by the authenticating user.
 
 			Parameters:
 				id - Required. The id of the saved search to be deleted.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.id) return sys.puts("You need to pass an ID to destroySavedSearch()");
+		
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/saved_searches/destroy/%s.json" % (version, `id`), ""))
-			except HTTPError, e:
-				raise TwythonError("destroySavedSearch() failed with a %s error code." % `e.code`, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/saved_searches/destroy/" + paramsObj.id + ".json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("destroySavedSearch() requires you to be authenticated.")
-	
+		}
+	},
+
 	createList: function(name, mode = "public", description = "") {
 		""" createList: function(name, mode, description, version)
 			
