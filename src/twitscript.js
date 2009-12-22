@@ -73,7 +73,13 @@ exports.init.prototype = {
 	},
 	
 	constructApiURL: function(base_url, params) {
-		return base_url + "?" + "&".join(["%s=%s" %(key, value) for (key, value) in params.iteritems()])
+		var returnURL = base_url + "?lol=1"; // Cheap hack, because it's 1:41 AM. Refactor if you care.
+
+		for(var i in params) {
+			returnURL += "&" + i.toString() + "=" + params[i];
+		}
+		
+		return returnURL;
 	},
 
 	getPublicTimeline: function(callbackfn) {
@@ -1391,8 +1397,8 @@ exports.init.prototype = {
 		}
 	},
 
-	createList: function(name, mode = "public", description = "") {
-		""" createList: function(name, mode, description, version)
+	createList: function(paramsObj, callbackfn) {
+		/*	createList: function(name, mode, description, version)
 			
 			Creates a new list for the currently authenticated user. (Note: This may encounter issues if you authenticate with an email; try username (screen name) instead).
 
@@ -1400,20 +1406,23 @@ exports.init.prototype = {
 				name - Required. The name for the new list.
 				description - Optional, in the sense that you can leave it blank if you don't want one. ;)
 				mode - Optional. This is a string indicating "public" or "private", defaults to "public".
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.name) return sys.puts("You must specify a name for the new List.");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists.json" % (version, self.username), 
-					urllib.urlencode({"name": name, "mode": mode, "description": description})))
-			except HTTPError, e:
-				raise TwythonError("createList() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/lists.json?name=" + paramsObj.name + "&mode=" + (paramsObj.mode ? paramsObj.mode : "public") + 
+					"&description=" + (paramsObj.description ? paramsObj.description : ""),
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("createList() requires you to be authenticated.")
-	
-	updateList: function(list_id, name, mode = "public", description = "") {
-		""" updateList: function(list_id, name, mode, description, version)
+		}
+	},
+
+	updateList: function(paramsObj, callbackfn) {
+		/*	updateList: function(paramsObj, callbackfn)
 			
 			Updates an existing list for the authenticating user. (Note: This may encounter issues if you authenticate with an email; try username (screen name) instead).
 			This method is a bit cumbersome for the time being; I'd personally avoid using it unless you're positive you know what you're doing. Twitter should really look
@@ -1424,74 +1433,82 @@ exports.init.prototype = {
 				name - Required. The name of the list, possibly for renaming or such.
 				description - Optional, in the sense that you can leave it blank if you don't want one. ;)
 				mode - Optional. This is a string indicating "public" or "private", defaults to "public".
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.list_id || !paramsObj.name) return sys.puts("You need to specify both a name and a list_id for updateList()");
+		
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists/%s.json" % (version, self.username, list_id), 
-					urllib.urlencode({"name": name, "mode": mode, "description": description})))
-			except HTTPError, e:
-				raise TwythonError("updateList() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/lists/" + paramsObj.list_id + ".json?name=" + paramsObj.name + "&mode=" + (paramsObj.mode ? paramsObj.mode : "public") +
+					"&description=" + (paramsObj.description ? paramsObj.description : ""),
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("updateList() requires you to be authenticated.")
-	
-	showLists: function() {
-		""" showLists: function(version)
+		}
+	},
+
+	showLists: function(callbackfn) {
+		/*	showLists: function(callbackfn)
 
 			Show all the lists for the currently authenticated user (i.e, they own these lists).
 			(Note: This may encounter issues if you authenticate with an email; try username (screen name) instead).
 
 			Parameters:
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists.json" % (version, self.username)))
-			except HTTPError, e:
-				raise TwythonError("showLists() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/" + this.username + "/lists.json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("showLists() requires you to be authenticated.")
-	
-	getListMemberships: function() {
-		""" getListMemberships: function(version)
+		}
+	},
+
+	getListMemberships: function(callbackfn) {
+		/*	getListMemberships: function(callbackfn)
 
 			Get all the lists for the currently authenticated user (i.e, they're on all the lists that are returned, the lists belong to other people)
 			(Note: This may encounter issues if you authenticate with an email; try username (screen name) instead).
 
 			Parameters:
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+				None
+		*/
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists/followers.json" % (version, self.username)))
-			except HTTPError, e:
-				raise TwythonError("getLists() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "GET",
+				url: "/" + this.username + "/lists/followers.json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("getLists() requires you to be authenticated.")
-	
-	deleteList: function(list_id) {
-		""" deleteList: function(list_id, version)
+		}
+	},
+
+	deleteList: function(paramsObj, callbackfn) {
+		/*	deleteList: function(paramsObj, callbackfn)
 
 			Deletes a list for the authenticating user. 
 
 			Parameters:
 				list_id - Required. The name of the list to delete - this gets turned into a slug, so you can pass it as that, or hope the transformation works out alright.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.list_id) return sys.puts("You need to provide a list_id to deleteList()");
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists/%s.json" % (version, self.username, list_id), "_method=DELETE"))
-			except HTTPError, e:
-				raise TwythonError("deleteList() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/lists/" + paramsObj.list_id + ".json?_method=DELETE"
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("deleteList() requires you to be authenticated.")
-	
-	getListTimeline: function(list_id, cursor = "-1", , paramsObj) {
-		""" getListTimeline: function(list_id, cursor, version, paramsObj)
+		}
+	},
+
+	getListTimeline: function(paramsObj, callbackfn) {
+		/*	getListTimeline: function(paramsObj, callbackfn)
 
 			Retrieves a timeline representing everyone in the list specified.
 
@@ -1502,95 +1519,95 @@ exports.init.prototype = {
 				count - Optional.  Specifies the number of statuses to retrieve. May not be greater than 200.
 				cursor - Optional. Breaks the results into pages. Provide a value of -1 to begin paging. 
 					Provide values returned in the response's "next_cursor" and "previous_cursor" attributes to page back and forth in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			baseURL = this.constructApiURL("http://api.twitter.com/%d/%s/lists/%s/statuses.json" % (version, self.username, list_id), paramsObj)
-			return simplejson.load: function(.opener.open(baseURL + "&cursor=%s" % cursor))
-		except HTTPError, e:
-			if e.code == 404:
-				return sys.puts("It seems the list you're trying to access is private/protected, and you don't have access. Are you authenticated and allowed?")
-			raise TwythonError("getListTimeline() failed with a %d error code." % e.code, e.code)
-	
-	getSpecificList: function(list_id) {
-		""" getSpecificList: function(list_id, version)
+		*/
+		if(!paramsObj.list_id) return sys.puts("You need to provide a list_id to getListTimeline()");
+		if(!paramsObj.cursor) paramsObj.cursor = "-1";
+		
+		return makeRequest({
+			type: "GET",
+			url: this.constructApiURL("/" + this.username + "/lists/" + paramsObj.list_id + "/statuses.json", paramsObj),
+			callback: callbackfn
+		});
+	},
+
+	getSpecificList: function(paramsObj, callbackfn) {
+		/*	getSpecificList: function(paramsObj, callbackfn)
 
 			Retrieve a specific list - this only requires authentication if the list you're requesting is protected/private (if it is, you need to have access as well).
 
 			Parameters:
 				list_id - Required. The name of the list to get - this gets turned into a slug, so you can pass it as that, or hope the transformation works out alright.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			if(this.authenticated === true) {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists/%s/statuses.json" % (version, self.username, list_id)))
-			} else {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/lists/%s/statuses.json" % (version, self.username, list_id)))
-		except HTTPError, e:
-			if e.code == 404:
-				return sys.puts("It seems the list you're trying to access is private/protected, and you don't have access. Are you authenticated and allowed?")
-			raise TwythonError("getSpecificList() failed with a %d error code." % e.code, e.code)
-	
-	addListMember: function(list_id) {
-		""" addListMember: function(list_id, id, version)
+		*/
+		if(!paramsObj.list_id) sys.puts("You need to pass an explicity list_id to getSpecificList()");
+		return this.makeRequest({
+			type: "GET",
+			url: "/" + this.username + "/lists/" + paramsObj.list_id + "/statuses.json",
+			callback: callbackfn
+		});
+	},
+
+	addListMember: function(paramsObj, callbackfn) {
+		/* addListMember: function(paramsObj, callbackfn)
 
 			Adds a new Member (the passed in id) to the specified list.
 
 			Parameters:
 				list_id - Required. The slug of the list to add the new member to.
 				id - Required. The ID of the user that's being added to the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.list_id || !paramsObj.id) return sys.puts("You need to pass an id and list_id to addListMember()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/members.json" % (version, self.username, list_id), "id=%s" % `id`))
-			except HTTPError, e:
-				raise TwythonError("addListMember() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/" + paramsObj.list_id + "/members.json?id=" + paramsObj.id,
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("addListMember requires you to be authenticated.")
-	
-	getListMembers: function(list_id) {
-		""" getListMembers: function(list_id)
+		}
+	},
+
+	getListMembers: function(paramsObj, callbackfn) {
+		/* getListMembers: function(paramsObj, callbackfn)
 	
 			Show all members of a specified list. This method requires authentication if the list is private/protected.
 	
 			Parameters:
 				list_id - Required. The slug of the list to retrieve members for.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			if(this.authenticated === true) {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/members.json" % (version, self.username, list_id)))
-			} else {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/members.json" % (version, self.username, list_id)))
-		except HTTPError, e:
-			raise TwythonError("getListMembers() failed with a %d error code." % e.code, e.code)
+		*/
+		if(!paramsObj.list_id) return sys.puts("You need to pass a list_id to getListMembers()");
+		return this.makeRequest({
+			type: "GET",
+			url: "/" + this.username + "/" + paramsObj.list_id + "/members.json",
+			callback: callbackfn
+		});
+	},
 	
-	removeListMember: function(list_id, id) {
-		""" removeListMember: function(list_id, id, version)
+	removeListMember: function(paramsObj, callbackfn) {
+		/*	removeListMember: function(paramsObj, callbackfn)
 
 			Remove the specified user (id) from the specified list (list_id). Requires you to be authenticated and in control of the list in question.
 
 			Parameters:
 				list_id - Required. The slug of the list to remove the specified user from.
 				id - Required. The ID of the user that's being added to the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		*/
+		if(!paramsObj.list_id || !paramsObj.id) return sys.puts("You need to pass both a list_id and an id of a user to removeListMember()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/members.json" % (version, self.username, list_id), "_method=DELETE"))
-			except HTTPError, e:
-				raise TwythonError("getListMembers() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/" + paramsObj.list_id + "/members.json?id=" + paramsObj.id + "&_method=DELETE",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("removeListMember() requires you to be authenticated.")
-	
-	isListMember: function(list_id, id) {
-		""" isListMember: function(list_id, id, version)
+		}
+	},
+
+	isListMember: function(paramsObj, callbackfn) {
+		/*	isListMember: function(paramsObj, callbackfn)
 
 			Check if a specified user (id) is a member of the list in question (list_id).
 
@@ -1599,53 +1616,59 @@ exports.init.prototype = {
 			Parameters:
 				list_id - Required. The slug of the list to check against.
 				id - Required. The ID of the user being checked in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			if(this.authenticated === true) {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/members/%s.json" % (version, self.username, list_id, `id`)))
-			} else {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/members/%s.json" % (version, self.username, list_id, `id`)))
-		except HTTPError, e:
-			raise TwythonError("isListMember() failed with a %d error code." % e.code, e.code)
-	
-	subscribeToList: function(list_id, version) {
-		""" subscribeToList: function(list_id, version)
+		*/
+		if(!paramsObj.list_id || !paramsObj.id) return sys.puts("You must pass both a list_id and an id to isListMember()");
+		return this.makeRequest({
+			type: "GET",
+			url: "/" + this.username + "/" + paramsObj.list_id + "/members/" + paramsObj.id + ".json",
+			callback: callbackfn
+		});
+	},
+
+	subscribeToList: function(paramsObj, callbackfn) {
+		/*	subscribeToList: function(paramsObj, callbackfn)
 
 			Subscribe the authenticated user to the list provided (must be public).
 
 			Parameters:
 				list_id - Required. The list to subscribe to.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
+		*/
+		if(!paramsObj.list_id) return sys.puts("You must pass a list_id to subscribeToList()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/following.json" % (version, self.username, list_id), ""))
-			except HTTPError, e:
-				raise TwythonError("subscribeToList() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/" + paramsObj.list_id + "/following.json",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("subscribeToList() requires you to be authenticated.")
-	
-	unsubscribeFromList: function(list_id, version) {
-		""" unsubscribeFromList: function(list_id, version)
+		}
+	},
+
+	unsubscribeFromList: function(paramsObj, callbackfn) {
+		/*	unsubscribeFromList: function(paramsObj, callbackfn)
 
 			Unsubscribe the authenticated user from the list in question (must be public).
 
 			Parameters:
 				list_id - Required. The list to unsubscribe from.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
+		*/
+		if(!paramsObj.list_id) return sys.puts("You must pass a list_id to unsubscribeFromList()");
+
 		if(this.authenticated === true) {
-			try:
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/following.json" % (version, self.username, list_id), "_method=DELETE"))
-			except HTTPError, e:
-				raise TwythonError("unsubscribeFromList() failed with a %d error code." % e.code, e.code)
+			return this.makeRequest({
+				type: "POST",
+				url: "/" + this.username + "/" + paramsObj.list_id + "/following.json?_method=DELETE",
+				callback: callbackfn
+			});
 		} else {
 			return sys.puts("unsubscribeFromList() requires you to be authenticated.")
-	
-	isListSubscriber: function(list_id, id) {
-		""" isListSubscriber: function(list_id, id, version)
+		}
+	},
+
+	isListSubscriber: function(paramsObj, callbackfn) {
+		/*	isListSubscriber: function(list_id, id, version)
 
 			Check if a specified user (id) is a subscriber of the list in question (list_id).
 
@@ -1654,19 +1677,17 @@ exports.init.prototype = {
 			Parameters:
 				list_id - Required. The slug of the list to check against.
 				id - Required. The ID of the user being checked in the list.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			if(this.authenticated === true) {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/following/%s.json" % (version, self.username, list_id, `id`)))
-			} else {
-				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/%s/%s/following/%s.json" % (version, self.username, list_id, `id`)))
-		except HTTPError, e:
-			raise TwythonError("isListMember() failed with a %d error code." % e.code, e.code)
-	
-	availableTrends: function(latitude = None, longitude = None) {
-		""" availableTrends(latitude, longitude, version) {
+		*/
+		if(!paramsObj.list_id || !paramsObj.id) return sys.puts("You need to pass both a list_id and an id to isListSubscriber()");
+		return this.makeRequest({
+			type: "GET",
+			url: "/" + this.username + "/" + paramsObj.list_id + "/following/" + paramsObj.id + ".json",
+			callback: callbackfn
+		});
+	},
+
+	availableTrends: function(paramsObj, callbackfn) {
+		/*	availableTrends(paramsObj, callbackfn)
 
 			Gets all available trends, optionally filtering by geolocation based stuff.
 
@@ -1675,18 +1696,14 @@ exports.init.prototype = {
 			Parameters:
 				latitude (string) - Optional. A latitude to sort by.
 				longitude (string) - Optional. A longitude to sort by.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
+		*/
 			if latitude is not None and longitude is not None:
 				return simplejson.load: function(.opener.open("http://api.twitter.com/%d/trends/available.json?latitude=%s&longitude=%s" % (version, latitude, longitude)))
 			return simplejson.load: function(.opener.open("http://api.twitter.com/%d/trends/available.json" % version))
-		except HTTPError, e:
-			raise TwythonError("availableTrends() failed with a %d error code." % e.code, e.code)
-	
-	trendsByLocation: function(woeid) {
-		""" trendsByLocation(woeid, version) {
+	},
+
+	trendsByLocation: function(paramsObj, callbackfn) {
+		/* trendsByLocation(woeid, version)
 
 			Gets all available trends, filtering by geolocation (woeid - see http://developer.yahoo.com/geo/geoplanet/guide/concepts.html).
 
@@ -1694,17 +1711,26 @@ exports.init.prototype = {
 
 			Parameters:
 				woeid (string) - Required. WoeID of the area you're searching in.
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
-		try:
-			return simplejson.load: function(.opener.open("http://api.twitter.com/%d/trends/%s.json" % (version, woeid)))
-		except HTTPError, e:
-			raise TwythonError("trendsByLocation() failed with a %d error code." % e.code, e.code)
+		*/
+		if(!paramsObj.woeid) return sys.puts("You need to pass a woeid to trendsByLocation()");
+		return this.makeRequest({
+			type: "GET",
+			url: "/trends/" + paramsObj.woeid + ".json",
+			callback: callbackfn
+		});
+	},	
 	
-	# The following methods are apart from the other Account methods, because they rely on a whole multipart-data posting function set.
+	/*
+	
+	################################################################
+		UNPORTED PYTHON CODE AHOY
+		It's 3AM, I'm not dealing with this right now. ;P
+	
+		- Ryan
+	################################################################
+
 	updateProfileBackgroundImage: function(filename, tile="true") {
-		""" updateProfileBackgroundImage(filename, tile="true")
+		/* updateProfileBackgroundImage(filename, tile="true")
 
 			Updates the authenticating user's profile background image.
 
@@ -1712,42 +1738,37 @@ exports.init.prototype = {
 				image - Required. Must be a valid GIF, JPG, or PNG image of less than 800 kilobytes in size. Images with width larger than 2048 pixels will be forceably scaled down.
 				tile - Optional (defaults to true). If set to true the background image will be displayed tiled. The image will not be tiled otherwise. 
 				** Note: It's sad, but when using this method, pass the tile value as a string, e.g tile="false"
-				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		
 		if(this.authenticated === true) {
-			try:
 				files = [("image", filename, open(filename, 'rb').read())]
 				fields = []
 				content_type, body = self.encode_multipart_formdata(fields, files)
 				headers = {'Content-Type': content_type, 'Content-Length': str(len(body))}
 				r = urllib2.Request("http://api.twitter.com/%d/account/update_profile_background_image.json?tile=%s" % (version, tile), body, headers)
 				return self.opener.open(r).read()
-			except HTTPError, e:
-				raise TwythonError("updateProfileBackgroundImage() failed with a %d error code." % e.code, e.code)
 		} else {
 			return sys.puts("You realize you need to be authenticated to change a background image, right?")
+		}
+	},
 
-	updateProfileImage: function(filename) {
-		""" updateProfileImage(filename)
+	updateProfileImage: function(paramsObj, callbackfn) {
+		/* updateProfileImage(filename)
 
 			Updates the authenticating user's profile image (avatar).
 
 			Parameters:
 				image - Required. Must be a valid GIF, JPG, or PNG image of less than 700 kilobytes in size. Images with width larger than 500 pixels will be scaled down.
 				version (number) - Optional. API version to request. Entire Twython class defaults to 1, but you can override on a function-by-function or class basis - (version=2), etc.
-		"""
-		version = version or self.apiVersion
+		
 		if(this.authenticated === true) {
-			try:
 				files = [("image", filename, open(filename, 'rb').read())]
 				fields = []
 				content_type, body = self.encode_multipart_formdata(fields, files)
 				headers = {'Content-Type': content_type, 'Content-Length': str(len(body))}
 				r = urllib2.Request("http://api.twitter.com/%d/account/update_profile_image.json" % version, body, headers)
 				return self.opener.open(r).read()
-			except HTTPError, e:
-				raise TwythonError("updateProfileImage() failed with a %d error code." % e.code, e.code)
 		} else {
 			return sys.puts("You realize you need to be authenticated to change a profile image, right?")
+		}
+	} */
 }
