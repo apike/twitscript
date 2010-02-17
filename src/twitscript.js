@@ -70,7 +70,7 @@ exports.init.prototype = {
 		// Check for GET, assume POST (DELETE methods just append _method=DELETE for now)
 		if(reqObj.type === "SEARCH") {
 			fullURL = reqObj.url;
-			request = this.search_opener.('GET', fullURL, {"host": "search.twitter.com", "User-Agent": this.headers});
+			request = this.search_opener.request('GET', fullURL, {"host": "search.twitter.com", "User-Agent": this.headers});
 		} else {
 			request = this.opener.request(reqObj.type, fullURL, this.headers);
 		}
