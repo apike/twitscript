@@ -75,7 +75,7 @@ exports.init.prototype = {
 			request = this.opener.request(reqObj.type, fullURL, this.headers);
 		}
 
-		return request.finish(function(resp) {
+		request.addListener('response', function (resp) {
 			var statusCode = resp.statusCode,
 				finalResp = "";
 
@@ -83,7 +83,7 @@ exports.init.prototype = {
 
 			if(statusCode !== 200) return sys.puts("Request to " + fullURL + " failed with a " + statusCode + " error code.");
 
-			resp.addListener("body", function(chunk) {
+			resp.addListener("data", function(chunk) {
 				finalResp += chunk;
 			});
 
@@ -91,6 +91,8 @@ exports.init.prototype = {
 				if(typeof reqObj.callback !== "undefined" && typeof reqObj.callback === "function") reqObj.callback(JSON.parse(finalResp));
 			});
 		});
+
+		return request.close();
 	},
 	
 	constructApiURL: function(base_url, params) {
