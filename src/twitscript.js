@@ -424,7 +424,34 @@ exports.init.prototype = {
 		else if(paramsObj.screen_name) apiURL = "/users/show.json?screen_name=" + screen_name;
 		else return sys.puts("You need to specify an id, user_id, or screen_name for showUser()");
 
-		return makeRequest({
+		return this.makeRequest({
+			type: "GET",
+			url: apiURL,
+			callback: callbackfn
+		});
+	},
+
+	bulkUserLookup: function(paramsObj, callbackfn) {
+		var apiURL = "/users/lookup.json?lol=1"; /* Cheese */
+		
+		if(typeof paramsObj.user_ids === "undefined" && typeof paramsObj.screen_names === "undefined")
+			return sys.puts("You need to pass in an Array of user_ids or screen_names to bulkUserLookup().");
+
+		if(paramsObj.user_ids && paramsObj.user_ids instanceof Array) {
+			apiURL += "&user_id=";
+
+			for(var i = 0; i < paramsObj.user_ids.length; i++)
+				apiURL += paramsObj.user_ids[i] + ",";
+		}
+
+		if(paramsObj.screen_names && paramsObj.screen_names instanceof Array) {
+			apiURL += "&screen_name=";
+
+			for(var i = 0; i < paramsObj.screen_names.length; i++)
+				apiURL += paramsObj.screen_names[i] + ",";
+		}
+
+		return this.makeRequest({
 			type: "GET",
 			url: apiURL,
 			callback: callbackfn
